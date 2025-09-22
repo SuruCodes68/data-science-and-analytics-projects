@@ -1,10 +1,6 @@
-\# Data Science and Analytics Projects
-
-
+# Data Science and Analytics Projects
 
 This repository is a collection of Python-based projects in data science, machine learning, and business analytics.
-
-
 
 Each project is built on real-world datasets and demonstrates skills in data cleaning, exploratory analysis, visualization, and model building.
 
@@ -14,37 +10,36 @@ Each project is built on real-world datasets and demonstrates skills in data cle
 
 
 
-\## Featured Project
+## Featured Project
+
+
+### Netflix Content Recommender
 
 
 
-\### Netflix Content Recommender
+**Goal:** Build a content-based recommender system for Netflix titles.  
 
 
 
-\*\*Goal:\*\* Build a content-based recommender system for Netflix titles.  
+**Techniques:** TF-IDF, cosine similarity, content explainability.  
 
 
 
-\*\*Techniques:\*\* TF-IDF, cosine similarity, content explainability.  
+**Highlights:**  
+
+- Recommends similar movies and TV shows.  
+
+- Explains *why* recommendations were made using shared keywords.  
+
+- Includes exploratory analysis of genres, release years, and production countries.  
 
 
 
-\*\*Highlights:\*\*  
+**Files:**  
 
-\- Recommends similar movies and TV shows.  
+-[Notebook (.ipynb)](Netflixdata.ipynb)  
 
-\- Explains \*why\* recommendations were made using shared keywords.  
-
-\- Includes exploratory analysis of genres, release years, and production countries.  
-
-
-
-\*\*Files:\*\*  
-
-\- \[Notebook (.ipynb)](Netflixdata.ipynb)  
-
-\- \[Clean Report (.html)](Netflixdata.html)
+-[Clean Report (.html)](Netflixdata.html)
 
 
 
