@@ -18,11 +18,11 @@ Each project is built on real-world datasets and demonstrates skills in data cle
 
 \### Netflix Content Recommender
 
-\- \*\*Goal:\*\* Build a content-based recommender system for Netflix titles.  
+&nbsp;\*\*Goal:\*\* Build a content-based recommender system for Netflix titles.  
 
-\- \*\*Techniques:\*\* TF-IDF, cosine similarity, content explainability.  
+&nbsp;\*\*Techniques:\*\* TF-IDF, cosine similarity, content explainability.  
 
-\- \*\*Highlights:\*\*  
+&nbsp;\*\*Highlights:\*\*  
 
 &nbsp; - Recommends similar movies and TV shows.  
 
@@ -30,7 +30,7 @@ Each project is built on real-world datasets and demonstrates skills in data cle
 
 &nbsp; - Includes exploratory analysis of genres, release years, and production countries.  
 
-\- \*\*Files:\*\*  
+&nbsp;\*\*Files:\*\*  
 
 &nbsp; - \[Notebook (.ipynb)](Netflixdata.ipynb)  
 
