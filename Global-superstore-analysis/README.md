@@ -1,4 +1,4 @@
-Global Superstore Data Analysis Report
+**Global Superstore Data Analysis Report**
 
 A Deep Dive into Profitability, Customer Segmentation, and Operational Efficiency
 
