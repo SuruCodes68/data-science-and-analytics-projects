@@ -8,6 +8,17 @@ Saint Mary’s College of California|MSBA
 
 
 
+
+
+
+
+
+
+
+
+
+
+
 ## 1. Project Goal
 
 The objective of this project was to conduct an in-depth exploratory data analysis (EDA) of the Global Superstore dataset (2011-2014). The goal was to move beyond surface-level metrics (like total sales) and uncover actionable, data-driven insights into the key drivers of profitability, customer behavior, and operational efficiency. This analysis aims to identify specific opportunities for cost reduction, marketing optimization, and strategic growth.
@@ -66,31 +77,31 @@ To find the true profit drivers, I analyzed product sub-categories by both volum
 
 • Code Explanation:
 
- sub_category_analysis = df.groupby('Sub-Category').agg(...): Aggregated Total_Sales and Total_Profit for all 17 sub-categories.
+- sub_category_analysis = df.groupby('Sub-Category').agg(...): Aggregated Total_Sales and Total_Profit for all 17 sub-categories.
 
- pd.merge(sub_category_analysis, category_map, ...): Merged in the parent category ('Furniture', 'Technology', 'Office Supplies') to add a strategic layer to the visualizations.
+- pd.merge(sub_category_analysis, category_map, ...): Merged in the parent category ('Furniture', 'Technology', 'Office Supplies') to add a strategic layer to the visualizations.
 
- Bar Plot Visualization (sns.barplot):
+**Bar Plot Visualization (sns.barplot):**
 
-This plot's bar length is mapped to Total_Profit (volume).
+- This plot's bar length is mapped to Total_Profit (volume).
 
-	The bar color is mapped to Profit_Margin (efficiency) using the coolwarm palette.
+- The bar color is mapped to Profit_Margin (efficiency) using the coolwarm palette.
 
-	Insight: This dual-encoding immediately highlights problem areas. "Tables" has a long bar (high sales/loss) but is colored bright red (negative margin), flagging it as a major profit drain.
+- Insight: This dual-encoding immediately highlights problem areas. "Tables" has a long bar (high sales/loss) but is colored bright red (negative margin), flagging it as a major profit drain.
 
-o	Scatter Plot (Quadrant Analysis):
+• Scatter Plot (Quadrant Analysis):
 
-	This plot maps Total_Sales (X-axis) vs. Profit_Margin (Y-axis) and uses hue to color by Category.
+- This plot maps Total_Sales (X-axis) vs. Profit_Margin (Y-axis) and uses hue to color by Category.
 
-	Insight: This is a classic business strategy plot.
+- Insight: This is a classic business strategy plot.
 
-	Stars (Top-Right): 'Copiers' and 'Phones' (Technology) have high sales and high margins.
+- Stars (Top-Right): 'Copiers' and 'Phones' (Technology) have high sales and high margins.
 
-	Problem Children (Bottom-Right): 'Tables', 'Bookcases', and 'Chairs' (Furniture) have high sales but low/negative margins.
+- Problem Children (Bottom-Right): 'Tables', 'Bookcases', and 'Chairs' (Furniture) have high sales but low/negative margins.
 
-	Opportunities (Top-Left): 'Paper' has the highest margin in the company but low sales.
+- Opportunities (Top-Left): 'Paper' has the highest margin in the company but low sales.
 
-	Dogs (Bottom-Left): 'Fasteners' and 'Supplies' have low sales and low margins.
+- Dogs (Bottom-Left): 'Fasteners' and 'Supplies' have low sales and low margins.
 
 3.4. Customer Segmentation (RFM Analysis)
 
@@ -98,19 +109,19 @@ To understand customer behavior, I applied RFM (Recency, Frequency, Monetary) se
 
 • Code Explanation:
 
-  O groupby('Customer ID').agg(...): Calculated the raw Recency (days since last order), Frequency (total unique orders), and Monetary (total sales) value for every customer.
+- groupby('Customer ID').agg(...): Calculated the raw Recency (days since last order), Frequency (total unique orders), and Monetary (total sales) value for every customer.
 
-  O pd.qcut(...): Scored each customer from 1 (worst) to 5 (best) for each of the three metrics.
+- pd.qcut(...): Scored each customer from 1 (worst) to 5 (best) for each of the three metrics.
 
-  O assign_segment(): A custom function was used to assign descriptive names based on their R and F scores.
+- assign_segment(): A custom function was used to assign descriptive names based on their R and F scores.
 
-  O Insight: This moves beyond the static 'Consumer' segment to identify behavioral groups. The analysis revealed key segments like:
+- Insight: This moves beyond the static 'Consumer' segment to identify behavioral groups. The analysis revealed key segments like:
 
-   Champions: ~430 high-value customers who buy often, spend a lot, and bought recently.
+I. Champions: ~430 high-value customers who buy often, spend a lot, and bought recently.
 
-   At Risk: ~370 customers who used to buy frequently but haven't returned in a while.
+II. At Risk: ~370 customers who used to buy frequently but haven't returned in a while.
 
-O Visualization (sns.countplot): The bar chart was ordered by each segment's Avg_Monetary value, providing a clear view of which customer groups are most valuable.
+- Visualization (sns.countplot): The bar chart was ordered by each segment's Avg_Monetary value, providing a clear view of which customer groups are most valuable.
 
 3.5. Market Basket & Operational Analysis
 
@@ -118,21 +129,21 @@ This section identified co-purchase patterns and quantified operational impacts.
 
 • Code Explanation (Market Basket):
 
-O itertools.combinations & collections.Counter: These tools were used to find and count the most common pairs of sub-categories purchased within the same Order ID.
+-  itertools.combinations & collections.Counter: These tools were used to find and count the most common pairs of sub-categories purchased within the same Order ID.
 
-O Insight: 'Binders' and 'Storage' are the most common pair, suggesting a bundling opportunity. More critically, the unprofitable 'Tables' are frequently purchased with profitable items, indicating they are dragging down the average cart value.
+- Insight: 'Binders' and 'Storage' are the most common pair, suggesting a bundling opportunity. More critically, the unprofitable 'Tables' are frequently purchased with profitable items, indicating they are dragging down the average cart value.
 
 • Code Explanation (Discounting):
 
-O pd.cut(...): Binned the discount percentages (0.1, 0.15, 0.2, etc.) into clean groups ('0-10%', '10-20%').
+- pd.cut(...): Binned the discount percentages (0.1, 0.15, 0.2, etc.) into clean groups ('0-10%', '10-20%').
 
-O Insight: The dual-axis chart plotting Total_Sales vs. Average_Profit_Margin for these bins clearly shows that the tipping point for profitability is ~25%. Any discount higher than this results in an average loss.
+- Insight: The dual-axis chart plotting Total_Sales vs. Average_Profit_Margin for these bins clearly shows that the tipping point for profitability is ~25%. Any discount higher than this results in an average loss.
 
 • Code Explanation (Management Performance):
 
-O groupby('Person').agg(...): Created a management scorecard with Total_Sales, Total_Profit, Total_Orders, and derived efficiency metrics (Avg_Profit_Margin, Profit_Per_Order).
+- groupby('Person').agg(...): Created a management scorecard with Total_Sales, Total_Profit, Total_Orders, and derived efficiency metrics (Avg_Profit_Margin, Profit_Per_Order).
 
-O Insight: The scatter plot (Total_Sales vs. Avg_Profit_Margin) provided a balanced view of performance. It identified managers like Nicole Hansen as highly efficient (27% margin) in a small market, and managers like Alejandro Ballentine as highly inefficient (2% margin) in a large market.
+- Insight: The scatter plot (Total_Sales vs. Avg_Profit_Margin) provided a balanced view of performance. It identified managers like Nicole Hansen as highly efficient (27% margin) in a small market, and managers like Alejandro Ballentine as highly inefficient (2% margin) in a large market.
 
 ## 4. Key Findings Summary
 
