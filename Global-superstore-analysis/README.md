@@ -69,7 +69,9 @@ Raw data is often not enough to answer business questions. New features were eng
 
 - df['Shipping_Cost_Pct_Sales'] = (df['Shipping Cost'] / df['Sales']) * 100: Created a metric to see which items have disproportionately high shipping costs relative to their sale price.
 
-- profit_vs_shipping['Profit_After_Shipping'] = ...: This powerful metric subtracts Total_Shipping_Cost from Total_Profit to find the true profitability of product sub-categories, revealing that items like 'Machines' and 'Chairs' are unprofitable once shipping is factored in.
+- profit_vs_shipping['Profit_After_Shipping'] = 
+
+- This powerful metric subtracts Total_Shipping_Cost from Total_Profit to find the true profitability of product sub-categories, revealing that items like 'Machines' and 'Chairs' are unprofitable once shipping is factored in.
 
 3.3. Profitability Analysis (BCG Matrix Concept)
 
@@ -79,7 +81,7 @@ To find the true profit drivers, I analyzed product sub-categories by both volum
 
 - sub_category_analysis = df.groupby('Sub-Category').agg(...): Aggregated Total_Sales and Total_Profit for all 17 sub-categories.
 
-- pd.merge(sub_category_analysis, category_map, ...): Merged in the parent category ('Furniture', 'Technology', 'Office Supplies') to add a strategic layer to the visualizations.
+- pd.merge(sub_category_analysis, category_map, Merged in the parent category ('Furniture', 'Technology', 'Office Supplies') to add a strategic layer to the visualizations.
 
 **Bar Plot Visualization (sns.barplot):**
 
