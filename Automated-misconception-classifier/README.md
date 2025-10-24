@@ -54,7 +54,4 @@ Here’s the thought process and how the implementation addresses it:
 
 - Perform weight analysis comparing the original ELECTRA weights to the fine-tuned weights to understand which parts of the model changed most during training.
 
-
-
-- This multi-stage approach uses the strengths of LLMs for data preparation (cleaning messy text and balancing classes) and the strengths of a fine-tuned transformer (ELECTRA) for the final nuanced classification task.
-
+This multi-stage approach uses the strengths of LLMs for data preparation (cleaning messy text and balancing classes) and the strengths of a fine-tuned transformer (ELECTRA) for the final nuanced classification task.
