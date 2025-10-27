@@ -1,0 +1,553 @@
+---
+title: "AeroPath: Predictive Modeling for NASA Drone Navigation"
+author: "Suranjana"
+date: "October 26, 2025"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: united
+    code_folding: hide
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+## Project Introduction
+
+In response to challenges in urban drone navigation, this project develops a predictive risk model to ensure drone safety. Standard map data is often outdated, failing to reflect the true height of obstacles. Our objective is to analyze map data from various sources, model its inaccuracies, and ultimately build a safety-aware pathfinding algorithm that can navigate a grid by predicting the *real* height of obstacles, not just what the map reports.
+
+## Part 1: Project Setup & Data Loading
+
+We begin by loading all necessary libraries and our core dataset.
+
+### Load All Required Libraries
+```{r load-libraries}
+# --- Load all required libraries ---
+
+# install.packages("tidyverse")
+# install.packages("summarytools")
+# install.packages("DataExplorer")
+# install.packages("MissMech")
+# install.packages("corrplot")
+# install.packages("lmtest")
+# install.packages("car")
+# install.packages("arm")
+# install.packages("brglm")
+# install.packages("logistf")
+# install.packages("brms")
+# install.packages("igraph")
+# install.packages("posterior") # brms dependency for as_draws_df
+
+# --- Load all required libraries ---
+library(tidyverse)
+library(summarytools)
+library(DataExplorer)
+library(ggplot2)
+library(dplyr)
+library(readr)
+library(MissMech)
+library(corrplot)
+library(lmtest)
+library(car)
+library(arm)
+library(brglm)
+library(logistf)
+library(brms)
+library(igraph)
+library(tidyr)
+library(posterior)
+```
+
+*This block consolidates all packages, making the script clean and easy to run. We've included everything from data manipulation (`tidyverse`) to advanced modeling (`brms`).*
+
+### Load the Map Dataset
+```{r load-data}
+# --- 2. LOAD AND INSPECT DATA ---
+
+# File location
+map_data <- read.csv("C:/Users/karki/Downloads/map_info.csv")
+
+# View first few rows
+head(map_data)
+```
+*The data is loaded successfully. We can see our key columns: coordinates (`x`, `y`), map metadata (`map_height`, `map_source`), and our two target variables: `real_height` (continuous) and `obstacle` (binary).* 
+
+# Initial Data Structure Inspection
+```{r str-data}
+str(map_data)
+
+# Summary statistics
+summary(map_data)
+```
+*The `summary()` output immediately reveals our first data quality issue: the `reported.obstacles` column has **7 missing values (`NA's`)** that we will need to address.*
+
+## Part 2: Exploratory Data Analysis (EDA) - Uncovering the Risk
+Our first formal task is to apply exploratory data analysis to understand the data's characteristics, find the problems, and validate our project's core assumptions.
+
+### Numerical Variable Analysis
+
+```{r eda-summary}
+# Reshape summary output to long format
+map_data %>%
+  dplyr::select(where(is.numeric)) %>%  # <-- FIX IS HERE
+  pivot_longer(cols = everything(), names_to = "variable", values_to = "value") %>%
+  group_by(variable) %>%
+  summarise(
+    mean = mean(value, na.rm = TRUE),
+    median = median(value, na.rm = TRUE),
+    sd = sd(value, na.rm = TRUE),
+    min = min(value, na.rm = TRUE),
+    max = max(value, na.rm = TRUE)
+  ) %>%
+  arrange(variable)
+```
+*This summary confirms our project's core premise: the `real_height` (max 83 ft) is often significantly greater than the `map_height` (max 50 ft). This discrepancy is the danger we need to model.*
+
+### Correlation Analysis
+
+```{r eda-correlation}
+# Compute correlation matrix
+cor_matrix <- map_data %>%
+  dplyr::select(where(is.numeric)) %>% 
+  cor(use = "pairwise.complete.obs")
+
+# Visualize correlation matrix
+corrplot::corrplot(cor_matrix,      
+         method = "color",
+         type = "full",
+         tl.col = "black",
+         tl.cex = 0.8,
+         diag = FALSE,
+         addCoef.col = "black",
+         number.cex = 0.7)
+```
+*The correlation matrix is very insightful. It confirms `map_height` is a strong positive predictor for `real_height` (0.82), making our modeling viable. `obstacle` also strongly correlates with `real_height` (0.69), which is expected.*
+
+
+## Part 3: Data Cleaning & Feature Engineering
+Before we can model, we must handle the missing data identified in our EDA and engineer new features that will help quantify risk.
+
+### Step 3.1: Check Missing Value Counts
+```{r check- NA}
+# Shows NA counts for every column
+colSums(is.na(map_data))
+```
+*This check confirms that all 7 missing values are isolated in the `reported.obstacles` column.*
+
+### Step 3.2: Clean Data (Pre-Imputation)
+```{r clean-data}
+# Clean map_source and remove duplicates
+map_data_clean <- map_data %>%
+  mutate(map_source = as.factor(tolower(map_source))) %>%
+  filter(!duplicated(.))
+
+# Confirm structure
+glimpse(map_data_clean)
+```
+*We create our `map_data_clean` object by converting `map_source` to a factor and removing any duplicate rows. This clean dataset is now ready for the MCAR test.*
+
+### Step 3.3: Test Missing Data Pattern (MCAR)
+
+```{r MCAR-test}
+# We'll include: reported.obstacles, map_height, real_height, map_last_update
+# We use map_data_clean, which we just created.
+data_to_check <- as.data.frame(map_data_clean[
+  , c("reported.obstacles", "map_height", "real_height", "map_last_update")
+])
+
+# Run MCAR test
+TestMCARNormality(data_to_check)
+```
+
+
+*The high p-value for the non-parametric test (0.325) means we **fail to reject the null hypothesis**. We can conclude the data is **Missing Completely At Random (MCAR)**. This is great news, as it statistically validates our plan to use a simple and robust method like mean imputation.*
+
+### Step 3.4: Impute Missing Data
+
+```{r impute-data}
+# Mean imputation for reported.obstacles on our clean data
+map_data_clean$reported.obstacles_imp <- ifelse(
+  is.na(map_data_clean$reported.obstacles),
+  mean(map_data_clean$reported.obstacles, na.rm = TRUE),
+  map_data_clean$reported.obstacles
+)
+
+# Check new column after imputation
+summary(map_data_clean$reported.obstacles_imp)
+```
+
+*With our imputation method validated, we now create a new, complete column `reported.obstacles_imp`. Our dataset is now fully clean, complete, and ready for feature engineering.*
+
+
+### Step 3.5: Feature Engineering
+```{r feature-engineering}
+# Derive height_error: the difference between real and map height
+map_data_clean$height_error <- map_data_clean$real_height - map_data_clean$map_height
+
+# Derive obstacle_report_ratio: number of obstacle reports per day since last update
+# We add +1 to denominator to avoid division by zero
+map_data_clean$obstacle_report_ratio <- map_data_clean$reported.obstacles_imp / (map_data_clean$map_last_update + 1)
+
+# Check summaries of new variables
+summary(map_data_clean[, c("height_error", "obstacle_report_ratio")])
+```
+*We engineer two powerful new features. `height_error` directly quantifies the danger (max error is 48 ft!), and `obstacle_report_ratio` measures drone activity relative to map freshness. These will be crucial for our risk maps.*
+
+## Part 4: Visualizing the Drone's "Minefield"
+
+Now that our data is clean and enriched, we create a series of visualizations to clearly communicate the scale of the risk.
+
+### Visualization 1: Map Update Freshness (Heatmap)
+
+```{r viz-heatmap}
+# Define freshness levels
+map_data_clean <- map_data_clean %>%
+  mutate(update_status = case_when(
+    map_last_update <= 5 ~ "Fresh (0–5 days)",
+    map_last_update <= 20 ~ "Moderate (6–20 days)",
+    TRUE ~ "Stale (21+ days)"
+  ))
+
+# Create a heatmap of update status by square
+ggplot(map_data_clean, aes(x = x, y = y, fill = update_status)) +
+  geom_tile(color = "white") +
+  scale_fill_manual(
+    values = c(
+      "Fresh (0–5 days)" = "#4CAF50",     # green
+      "Moderate (6–20 days)" = "#FFC107", # yellow
+      "Stale (21+ days)" = "#F44336"      # red
+    )
+  ) +
+  coord_fixed() +
+  labs(
+    title = "Map Update Freshness by Square",
+    x = "X Coordinate",
+    y = "Y Coordinate",
+    fill = "Update Status"
+  ) +
+  theme_minimal()
+```
+
+*This map is a sea of red, and that's a huge problem. Nearly all the data is "Stale" (over 21 days old), so relying on it is like "flying blind." This risk is exactly why we need a predictive model.*
+
+### Visualization 2: Map Freshness (Bar Plot)
+
+```{r viz-barplot}
+map_data_clean %>%
+  count(update_status) %>%
+  ggplot(aes(x = update_status, y = n, fill = update_status)) +
+  geom_bar(stat = "identity", width = 0.6) +
+  geom_text(aes(label = n), vjust = -0.5, size = 5) +
+  scale_fill_manual(values = c(
+    "Fresh (0–5 days)" = "#2ca02c",
+    "Moderate (6–20 days)" = "#ff7f0e",
+    "Stale (21+ days)" = "#d62728"
+  )) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
+  labs(
+    title = "Number of Squares by Map Update Freshness",
+    x = "Update Status",
+    y = "Number of Squares",
+    fill = "Legend"
+  ) +
+  theme_minimal(base_size = 13)
+```
+*This chart quantifies the risk: 76 out of 100 squares have dangerously stale data, while only 7 are freshly updated and reliable.*
+
+### Visualization 3: Drone Safety Risk Map (Logic)
+
+This brings us to the question: "Where are the highest risks for drone collisions?" We will define a set of safety rules based on our engineered variables.
+- **Safe to fly:** Low height error and a recently updated map.
+- **Caution zone:** Medium height error but a freshly updated map.
+- **Danger zone:** High height error OR a stale map with medium error.
+- **Map needs update:** Low height error but an outdated map (risk is uncertain).
+
+```{r viz-risk-logic}
+# Reclassify safety using our defined logic
+map_data_clean <- map_data_clean %>%
+  mutate(
+    height_risk = case_when(
+      height_error <= 10 ~ "Low",
+      height_error <= 25 ~ "Medium",
+      TRUE ~ "High"
+    ),
+    map_fresh = ifelse(map_last_update <= 5, TRUE, FALSE),
+    safety_status = case_when(
+      height_risk == "Low" & map_fresh ~ "Safe to Fly",
+      height_risk == "Low" & !map_fresh ~ "Map Needs Update",
+      height_risk == "Medium" & map_fresh ~ "Caution Zone",
+      height_risk == "Medium" & !map_fresh ~ "Danger Zone",
+      height_risk == "High" ~ "Danger Zone"
+    )
+  )
+```
+*This `dplyr` code block is the "brain" behind our final risk map. It translates our raw data into these four clear, actionable safety statuses by combining `height_error` with `map_fresh`.*
+
+### Visualization 4: Drone Safety Risk Map (Plot)
+```{r viz-risk-plot}
+# Better color scale
+color_scheme <- c(
+  "Safe to Fly" = "#2ca02c",        # Green
+  "Map Needs Update" = "#bdbdbd",   # Gray
+  "Caution Zone" = "#ffcc00",       # Yellow
+  "Danger Zone" = "#d62728"         # Red
+)
+
+# Plot again with fixed logic
+ggplot(map_data_clean, aes(x = x, y = y, fill = safety_status)) +
+  geom_tile(color = "white", size = 0.3) +
+  scale_fill_manual(values = color_scheme) +
+  labs(
+    title = "Refined Drone Safety Risk Map (Height Error + Map Freshness)",
+    fill = "Drone Risk Status",
+    x = "X Coordinate",
+    y = "Y Coordinate"
+  ) +
+  theme_minimal(base_size = 13)
+```
+*This map confirms our fears. The grid is a minefield of confirmed dangers and high-risk unknowns, dominated by **"Danger Zones" (red)** and **"Map Needs Update" (gray)**.*Safe to Fly" (green) squares—the only ones meeting our strict criteria - are exceptionally rare.*
+
+### Visualization 5: Map Source Reliability
+
+```{r viz-boxplot}
+ggplot(map_data_clean, aes(x = map_source, y = height_error, fill = map_source)) +
+  geom_boxplot() +
+  labs(
+    title = "Comparison of Height Error by Map Source",
+    x = "Map Source",
+    y = "Height Error (in feet)"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+*This visual tells a clear story: the **`google` map is an extreme gamble**. Its massive blue box shows it's wildly inconsistent, with errors ranging from near-zero to a catastrophic 50 ft. In contrast, the **`army` map is the clear professional choice**, offering the most predictable and consistently low-error performance.*
+
+## Part 5: Model 1 - Predicting Exact Height (Linear Regression)
+
+Our second task is to create a linear regression model to predict the `real_height` for each square. This model will help us understand *which* variables drive the map's inaccuracy.
+
+### Initial Linear Model
+```{r lm-initial}
+# Fit the linear regression model (excluding obstacle)
+model_real_height <- lm(real_height ~ map_height + reported.obstacles_imp + map_last_update + map_source,
+                        data = map_data_clean)
+summary(model_real_height)
+```
+*This first model explains 76% of the height variance (Adjusted R-squared = 0.7628), confirming **`map_height`**is the single most dominant predictor. However,the wide residual range hints that potential outliers are skewing the results.*
+
+
+# --- Outlier detection and removal
+```{r lm-outliers}
+# Calculate Cook's distance
+cooks_d <- cooks.distance(model_real_height)
+# Visualize Cook's Distance
+map_data_clean$cooks_d <- cooks_d
+plot(cooks_d, type = "h", main = "Cook's Distance", ylab = "Distance")
+cutoff <- 10 / nrow(map_data_clean) # Set a cutoff threshold
+abline(h = cutoff, col = "red", lty = 2)
+
+# Filter out influential points
+map_data_clean_no_outliers <- map_data_clean %>%
+  filter(cooks_d <= cutoff)
+```
+
+*The Cook's Distance plot identifies several influential outliers (points above the red line). We filter these out to create a more robust and accurate model.*
+
+### Refined Linear Model
+```{r lm-refined}
+# Refit model without outliers
+model_real_height_clean <- lm(real_height ~ map_height + reported.obstacles_imp +map_last_update + map_source,
+                  data = map_data_clean_no_outliers)
+summary(model_real_height_clean)
+```
+*Success. After removing outliers, our Adjusted R-squared improved, and more predictors (like `map_sourcearmy`) became statistically significant. This model is a much better fit, and we can now confidently validate its assumptions.*
+
+### Linear Model Assumption Checks
+
+```{r lm-assumptions}
+# 1. Linearity
+plot(model_real_height_clean$fitted.values, model_real_height_clean$residuals,
+     xlab = "Fitted Values", ylab = "Residuals",
+     main = "Residuals vs Fitted Values")
+abline(h = 0, col = "red")
+
+# 2. Normality of residuals ((H0: Residuals are normal))
+shapiro.test(model_real_height_clean$residuals)
+
+# 3.Homoscedasticity (H0: Residuals have constant variance)
+bptest(model_real_height_clean)
+
+# 4. Independence (H0: No autocorrelation)
+# Durbin-Watson Test (H0: No autocorrelation)
+dwtest(model_real_height_clean)
+
+# 5. Multicollinearity
+vif(model_real_height_clean)
+```
+*All assumptions are satisfied. The residual plot shows random scatter, the Shapiro-Wilk and Breusch-Pagan tests are not significant (p > 0.05), and all VIF scores are near 1. Our linear model is statistically valid and reliable.*
+
+## Part 6: Model 2 - Predicting Obstacle Presence (Logistic Regression)
+Our third task is to build a logistic regression model. Instead of predicting the *exact* height, this model will predict the *probability* of an obstacle being present (the `obstacle` column).
+
+### Fit Logistic Regression Model
+```{r glm-fit}
+# Fit logistic regression model
+obstacle_glm <- glm(obstacle ~ map_height + reported.obstacles_imp + map_last_update + map_source,
+                    family = binomial(link = "logit"),
+                    data = map_data_clean)
+summary(obstacle_glm)
+```
+*This model is also a good fit. Unsurprisingly, `map_height` is again the most significant predictor. For every 1-foot increase in map height, the log-odds of there being a real obstacle increase by 0.19.*
+
+
+### Get Model Predictions (Probabilities)
+```{r glm-predict}
+# 1. Use the predict() function
+# 'type = "response"' is the key part that says "give me probabilities 0-1"
+probabilities <- predict(obstacle_glm, type = "response")
+
+# 2. Let's look at the first 10 probabilities
+head(probabilities)
+```
+*The `summary()` output shows the model's formula, but this `predict()` function is what we use to get the actual answers. The `type = "response"` command converts the mathematical "log-odds" into a simple probability (from 0 to 1), telling us the percentage chance of an obstacle for each square.It , shows the model is 6.1% sure row 1 is an obstacle, but 100% sure rows 2-6 are.*
+
+### Logistic Model Goodness-of-Fit Check
+```{r glm-check}
+# Generate a binned residual plot to assess model fit
+binnedplot(predict(obstacle_glm), resid(obstacle_glm),
+           main = "Binned Residual Plot",
+           xlab = "Predicted Probabilities",
+           ylab = "Residuals")
+```
+*The binned residual plot confirms our model fits the data well. All the black dots (average residuals) lie comfortably within the 95% confidence bands, indicating no major specification errors.*
+
+## Part 7: Model 3 - Predicting Risk Probability (Bayesian Regression)
+
+### Fit Bayesian Regression Model
+```{r brm-fit}
+# Fit the Bayesian regression model
+Bayesian_model <- brm(
+  real_height ~ map_height + reported.obstacles_imp + map_last_update +         map_source,
+  data = map_data_clean,
+  iter = 2000,
+  warmup = 200,
+  chains = 3,
+  thin = 2
+)
+
+# Print summary of the model
+print(summary(Bayesian_model))
+```
+
+*The model converged successfully, indicated by all **Rhat values being 1.00**. The estimates are similar to our linear model, but now we have 95% credible intervals for each predictor, giving us a much richer understanding of their potential impact.*
+
+## Part 8: Application - Building a Safe Pathfinding Algorithm
+
+In our final section, we use our Bayesian model to build a real-world application: a path-planning algorithm that avoids danger by considering height uncertainty.
+
+### Step 1: Calculate Safety Probabilities
+We will use our model to calculate the probability that the *true* height is 20 feet or less - a safe altitude for a drone.
+
+```{r brm-predict}
+# 1. Get all predictions at once (Vectorized is faster than a loop)
+lin_preds <- posterior_linpred(Bayesian_model, newdata = map_data_clean)
+
+# 2. Calculate the probability for each column (observation)
+# This finds the % of draws that were <= 20 for each square.
+safe_probs <- apply(lin_preds, 2, function(col) mean(col <= 20))
+
+# Add probabilities and safety classification to the data frame
+map_data_clean$safe_prob <- safe_probs
+map_data_clean$bayesian_safety <- ifelse(map_data_clean$safe_prob > 0.5, "Safe", "Unsafe")
+
+# View the safety breakdown
+table(map_data_clean$bayesian_safety)
+```
+*Our Bayesian model has classified the grid based on a 50% probability threshold of being under 20ft. It classifies 85 squares as "Unsafe" and 15 as "Safe," giving us a clear risk-based map to build our pathfinder.*
+
+
+### Step 2: Identify Start and End Nodes
+```{r brm-nodes}
+# Get top 2 blocks with highest predicted safety probability
+top_safe_coords <- map_data_clean %>%
+  arrange(desc(safe_prob)) %>%
+  slice(1:2) %>%
+  dplyr::select(x, y)
+
+print("Top 2 Safest Coordinates (Start and End):")
+print(top_safe_coords)
+```
+*For this demonstration, our model has identified the two "safest" squares in the entire grid to act as our origin **(2_8)**and destination **(7_3)**.*
+
+### Step 3: Build the Weighted Graph
+```{r brm-graph-build}
+# --- Build Edge List ---
+# Helper function to get safety prob for a coordinate
+get_prob <- function(x, y, data) {
+  prob <- data$safe_prob[data$x == x & data$y == y]
+  if (length(prob) == 0) { return(NA) }
+  return(prob)
+}
+
+# Create the edge list
+edge_list <- list()
+for (i in 1:nrow(map_data_clean)) {
+  row <- map_data_clean[i, ]
+  x1 <- row$x
+  y1 <- row$y
+  node1 <- paste(x1, y1, sep = "_")
+  
+  # Define potential neighbors (up, down, left, right)
+  neighbors_coords <- data.frame(
+    x2 = c(x1, x1, x1 - 1, x1 + 1),
+    y2 = c(y1 - 1, y1 + 1, y1, y1)
+  )
+  
+  for (j in 1:nrow(neighbors_coords)) {
+    x2 <- neighbors_coords$x2[j]
+    y2 <- neighbors_coords$y2[j]
+    
+    # Check if neighbor is within the 10x10 grid
+    if (x2 >= 1 && x2 <= 10 && y2 >= 1 && y2 <= 10) {
+      node2 <- paste(x2, y2, sep = "_")
+      neighbor_prob <- get_prob(x2, y2, map_data_clean)
+      
+      # Calculate weight (cost): 1 + (1 - safety_prob_neighbor)
+      cost <- 1 + (1 - neighbor_prob)
+      
+      if (node1 < node2) {
+        edge_list[[length(edge_list) + 1]] <- data.frame(from = node1, to = node2, weight = cost)
+      }
+    }
+  }
+}
+edges <- do.call(rbind, edge_list)
+head(edges)
+```
+*This is the core of our application. We build a graph where the "cost" to move to a new square is **inversely proportional to its safety**. Moving to a very safe square (prob = 0.9) costs little (1.1), while moving to an unsafe square (prob = 0.1) is very expensive (1.9). This penalizes unsafe routes.*
+
+### Step 4: Find the Safest Path
+```{r brm-pathfind}
+# 1) Build the graph from the edge list
+grid_graph <- graph_from_data_frame(d = edges, directed = FALSE)
+
+# 2) Get our start and end nodes from Step 2
+start_node <- paste(top_safe_coords$x[1], top_safe_coords$y[1], sep = "_")
+end_node   <- paste(top_safe_coords$x[2], top_safe_coords$y[2], sep = "_")
+
+# 3) Compute the safe path
+# We use weights = NA to tell igraph to use the "weight" attribute we just built
+shortest_path <- shortest_paths(
+  grid_graph,
+  from    = start_node,
+  to      = end_node,
+  weights = NA, 
+  output  = "vpath"
+)$vpath[[1]]
+
+# 4) Print the path
+cat("Safest path from", start_node, "to", end_node, ":\n")
+print(names(shortest_path))
+```
+*Success! Our algorithm can now find the path from **2_8 to 7_3**with the lowest cumulative safety cost. This path, derived directly from our Bayesian model, provides a truly "safety-aware" route that intelligently avoids the grid's most dangerous areas, successfully completing our project's objective.*
