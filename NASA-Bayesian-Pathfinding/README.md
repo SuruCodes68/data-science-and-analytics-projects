@@ -35,13 +35,10 @@ The key features include:
 
 • map_source: The provider of the map data (e.g., Google, Army).
 
-
-
 • reported.obstacles: Number of times other drones have reported an obstacle.
 
 
-
-A key business rule is the definition of an obstacle: obstacle = 1 if real\_height > 20, otherwise obstacle = 0.
+A key business rule is the definition of an obstacle: obstacle = 1 if real_height > 20, otherwise obstacle = 0.
 
 
 
@@ -55,11 +52,11 @@ My workflow was designed to build up from simple analysis to a final, complex ap
 
 I first analyzed the 100-square grid to understand the problem. Key findings included:
 
-• Data is Stale: 76% of the map grid was dangerously "Stale" (not updated in 21+ days).
+• **Data is Stale:** 76% of the map grid was dangerously "Stale" (not updated in 21+ days).
 
-• Source Matters: The google map source was wildly inconsistent and unreliable, while the army source was the most consistent, as shown by the boxplot of height errors.
+• **Source Matters:** The google map source was wildly inconsistent and unreliable, while the army source was the most consistent, as shown by the boxplot of height errors.
 
-• Risk is Everywhere: I combined height_error and update_status to create a "Drone Safety Risk Map," which confirmed that "Safe to Fly" zones were exceptionally rare.
+• **Risk is Everywhere:** I combined height_error and update_status to create a "Drone Safety Risk Map," which confirmed that "Safe to Fly" zones were exceptionally rare.
 
 
 
@@ -67,14 +64,14 @@ I first analyzed the 100-square grid to understand the problem. Key findings inc
 
 Before building the final model, I used two "scout" models to diagnose the data, validate assumptions, and prove the concept.
 
-• Linear Regression: This model's primary goal was diagnostics.
+• **Linear Regression:** This model's primary goal was diagnostics.
 
 - It confirmed map_height and map_source were significant predictors of real_height.
 
 - Crucially, its Residuals output showed large errors, which led me to use Cook's Distance to identify and remove influential outliers. This data cleaning benefited all subsequent models.
 
 
-• Logistic Regression: This model explored a different question: "Can we predict the binary presence (1/0) of an obstacle?"
+• **Logistic Regression:** This model explored a different question: "Can we predict the binary presence (1/0) of an obstacle?"
 
 - It confirmed map_height was the most significant predictor.
 
@@ -86,9 +83,9 @@ Before building the final model, I used two "scout" models to diagnose the data,
 
 This is the final and most powerful model, as it is the only one that can properly handle uncertainty.
 
-- Why Bayesian? A Linear Model gives a single-number guess (e.g., "the height is 30.5 ft"). A Bayesian model gives a full probability distribution.
+- **Why Bayesian?** A Linear Model gives a single-number guess (e.g., "the height is 30.5 ft"). A Bayesian model gives a full probability distribution.
 
-- The Result: The model converged successfully (Rhat = 1.00) after running 2,700 simulation samples across 3 chains. This distribution of 2,700 possibilities for each square gave 95% Credible Intervals for all predictors and allowed me to move beyond simple prediction to true risk assessment.
+- **The Result:** The model converged successfully (Rhat = 1.00) after running 2,700 simulation samples across 3 chains. This distribution of 2,700 possibilities for each square gave 95% Credible Intervals for all predictors and allowed me to move beyond simple prediction to true risk assessment.
 
 
 
@@ -96,9 +93,9 @@ This is the final and most powerful model, as it is the only one that can proper
 
 This is the final step, where I translated the 2,700 Bayesian samples into a real-world tool:
 
-1. Calculate Safety Probability: I used the Bayesian model's distribution (posterior_linpred) to calculate a safe_prob for every square—the exact probability (out of 2,700 samples) that its real_height was safely under 20ft.
+1. **Calculate Safety Probability:** I used the Bayesian model's distribution (posterior_linpred) to calculate a safe_prob for every square—the exact probability (out of 2,700 samples) that its real_height was safely under 20ft.
 
-2. Build a Weighted Graph: I built a grid where the "cost" to move to any square was inversely proportional to its safety.
+2. **Build a Weighted Graph:** I built a grid where the "cost" to move to any square was inversely proportional to its safety.
 
 • cost = 1 + (1 - safe_prob)
 
@@ -106,7 +103,7 @@ This is the final step, where I translated the 2,700 Bayesian samples into a rea
 
 • A very unsafe square (e.g., 10% safe) has a high cost: 1 + (1 - 0.10) = 1.90
 
-3. Find the Safest Path: Finally, I used igraph's shortest_paths function to find the "cheapest" path from the start node (2_8) to the end node (7_3).
+3. **Find the Safest Path:** Finally, I used igraph's shortest_paths function to find the "cheapest" path from the start node (2_8) to the end node (7_3).
 
 The resulting path (2_8 -> 2_7 -> ... -> 7_3) is not the shortest, but it is the safest, as it intelligently navigates around the squares our model identified as having the highest risk and uncertainty.
 
