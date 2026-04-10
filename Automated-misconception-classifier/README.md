@@ -1,57 +1,119 @@
-﻿# Conceptual Workflow
+﻿# Automated Misconception Classifier
+## Fine-tuned ELECTRA with LLM-driven Synthetic Data Generation
 
-This project tackles the challenge of automatically identifying specific mathematical misconceptions students have based on their free-text explanations for multiple-choice answers. The core problem is that real-world educational data often has a severe class imbalance: common misconceptions are frequent, while many specific ones are rare, making it hard for a standard machine learning model to learn the rare ones.
+![Python](https://img.shields.io/badge/Python-3.10-blue)
+![HuggingFace](https://img.shields.io/badge/HuggingFace-ELECTRA-yellow)
+![LLM](https://img.shields.io/badge/LLM-Qwen2.5-green)
+![Accuracy](https://img.shields.io/badge/Accuracy-99%25-brightgreen)
+![F1](https://img.shields.io/badge/Macro_F1-0.944-brightgreen)
 
+---
 
+## The Problem
 
-Here’s the thought process and how the implementation addresses it:
+Automatically classify student mathematical misconceptions from
+free-text explanations. Real educational datasets suffer from
+**extreme class imbalance** - the rarest misconception category
+appeared only once for every 14,800 majority-class samples.
 
+---
 
+## Pipeline Architecture
 
-**Problem Definition:** We need to classify student explanations into categories, including identifying specific misconceptions. The target isn't just one label, but multiple pieces of information (answer correctness, category, misconception type).
+```
+Raw Student Text
+    |
+    v  [Qwen LLM] Fix encoding errors and standardize notation
+    |
+    v  [Qwen LLM] Generate 113,000+ synthetic minority samples
+    |
+    v  Composite Label Creation
+       (Answer Correctness + Category + Misconception = 1 label)
+    |
+    v  ELECTRA Fine-tuning
+       (gradient accumulation + early stopping)
+    |
+    v  Validation on 36,696 original non-synthetic samples
+```
 
+## Results
+| Metric | Score |
+|--------|-------|
+| Composite Label Accuracy | **99.00%** |
+| Weighted F1-Score | **0.9900** |
+| Macro F1-Score | **0.9441** |
+| Total Validation Samples | 36,696 (original only) |
+| Classes Predicted | 65 composite labels |
 
+Validation used **only original data** - synthetic samples were
+strictly kept in training. This ensures realistic performance
+measurement on real student responses.
 
-**Initial Idea - Simplify the Target:** Instead of predicting three separate things, combine them into a single composite label (e.g., False_Misconception:Additive). This turns it into a standard multi-class classification problem.
+## Component-Wise Accuracy
 
+| Component | Accuracy |
+|-----------|----------|
+| Answer Correctness (True/False) | 99.48% |
+| Category (Correct/Neither/Misconception) | 99.27% |
+| Misconception Name (34 types + NA) | 99.41% |
 
+- 42 out of 65 labels achieved 100% accuracy
+- Macro F1 of 0.9441 confirms strong performance on rare
+  minority classes, not just majority
 
-**Data Quality Issue:** Real student text is messy. It contains typos, grammatical errors, and sometimes character encoding problems ("mojibake"). Standard NLP models struggle with inconsistent input.
+---
 
+## Tech Stack
 
+| Tool | Purpose |
+|------|---------|
+| google/electra-base-discriminator | Classification model |
+| Qwen/Qwen2.5-0.5B-Instruct | Text cleaning + augmentation |
+| HuggingFace Transformers | Fine-tuning framework |
+| scikit-learn | Evaluation metrics |
+| Python 3.10 | Core language |
+| Google Colab | Training environment |
 
-**Solution - LLM for Cleaning:** Use a Large Language Model (LLM), specifically Qwen, which is good at understanding and manipulating text, to revise the student explanations. The key here is careful prompting: instruct the LLM to fix only objective errors (encoding, spelling, basic grammar) and strictly forbid it from changing the student's core meaning, phrasing, or logical flow. This standardizes the text without altering the underlying reasoning (or lack thereof).
+---
+## Dataset
 
+Source: Kaggle Competition -
+MAP: Charting Student Math Misunderstandings
 
+- Training samples: 36,696 original + 113,000+ synthetic
+- Misconception categories: 34 unique types
+- Composite labels: 65 total
 
-**Data Quantity Issue (Imbalance):** Many misconception categories have very few examples. A model trained on this data will be biased towards the majority classes and perform poorly on rare misconceptions.
+---
+## Key Technical Decisions
 
+**Why Composite Labels?**
+Predicting a single combined label such as
+False_Misconception:Additive instead of three separate outputs
+simplified the architecture while preserving full label
+granularity.
 
+**Why LLM for Augmentation vs SMOTE?**
+Text data cannot be interpolated numerically. Qwen generates
+semantically valid new student explanations that preserve the
+student's reasoning patterns rather than creating artificial
+vector interpolations.
+**Why ELECTRA over BERT?**
+ELECTRA's replaced token detection pre-training makes it more
+sample-efficient and better at detecting subtle linguistic
+differences in student reasoning.
 
-**Solution - LLM for Augmentation:** Use the same LLM (Qwen) to generate synthetic data for the minority classes. Again, prompting is key: provide the LLM with details of an existing example (question, student's answer, correctness, category, misconception) and ask it to generate a new, unique explanation that fits the same pattern. This creates more training examples for rare categories, helping to balance the dataset.
+---
 
+## View Full Notebook
 
+Open in Google Colab (all outputs visible):
+https://colab.research.google.com/github/SuruCodes68/data-science-and-analytics-projects/blob/main/Automated-misconception-classifier/LLM_Augmented_Misconception_Classifier.ipynb
 
-**Modeling Choice:** We need a model good at understanding text nuances for classification. A pre-trained transformer model like ELECTRA is suitable. It's already been trained on vast amounts of text and can be adapted (fine-tuned) for this specific task.
+---
 
+## Author
 
-
-**Training:** Fine-tune the ELECTRA model on the combined dataset (original cleaned data + synthetic augmented data) to predict the composite labels. Use standard deep learning techniques like batching, gradient accumulation (to simulate larger batches), and evaluation metrics (accuracy, F1-score). Use early stopping to prevent overfitting.
-
-
-
-**Evaluation:**
-
-
-
-- Evaluate the fine-tuned model on a held-out validation set consisting only of original, unaugmented data. This gives a realistic measure of performance on real-world examples.
-
-
-
-- Analyze performance not just on the composite label, but also by parsing the predicted composite label back into its components (Answer Correctness, Category, Misconception) to see how well the model performs on each aspect individually.
-
-
-
-- Perform weight analysis comparing the original ELECTRA weights to the fine-tuned weights to understand which parts of the model changed most during training.
-
-This multi-stage approach uses the strengths of LLMs for data preparation (cleaning messy text and balancing classes) and the strengths of a fine-tuned transformer (ELECTRA) for the final nuanced classification task.
+Suranjana Aryal
+LinkedIn: https://www.linkedin.com/in/suranjana-aryal
+GitHub: https://github.com/SuruCodes68
