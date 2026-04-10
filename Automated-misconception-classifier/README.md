@@ -100,7 +100,9 @@ Text data cannot be interpolated numerically. Qwen generates
 semantically valid new student explanations that preserve the
 student's reasoning patterns rather than creating artificial
 vector interpolations.
+
 **Why ELECTRA over BERT?**
+
 ELECTRA's replaced token detection pre-training makes it more
 sample-efficient and better at detecting subtle linguistic
 differences in student reasoning.
