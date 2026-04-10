@@ -49,7 +49,7 @@ Validation used **only original data** - synthetic samples were
 strictly kept in training. This ensures realistic performance
 measurement on real student responses.
 
-## Component-Wise Accuracy
+## Component-wise Accuracy
 
 | Component | Accuracy |
 |-----------|----------|
@@ -88,12 +88,14 @@ MAP: Charting Student Math Misunderstandings
 ## Key Technical Decisions
 
 **Why Composite Labels?**
+
 Predicting a single combined label such as
 False_Misconception:Additive instead of three separate outputs
 simplified the architecture while preserving full label
 granularity.
 
 **Why LLM for Augmentation vs SMOTE?**
+
 Text data cannot be interpolated numerically. Qwen generates
 semantically valid new student explanations that preserve the
 student's reasoning patterns rather than creating artificial
@@ -108,12 +110,15 @@ differences in student reasoning.
 ## View Full Notebook
 
 Open in Google Colab (all outputs visible):
+
 https://colab.research.google.com/github/SuruCodes68/data-science-and-analytics-projects/blob/main/Automated-misconception-classifier/LLM_Augmented_Misconception_Classifier.ipynb
 
 ---
 
 ## Author
 
-Suranjana Aryal
-LinkedIn: https://www.linkedin.com/in/suranjana-aryal
+**Suranjana Aryal** 
+
+LinkedIn: https://www.linkedin.com/in/suranjana-aryal  
+
 GitHub: https://github.com/SuruCodes68
